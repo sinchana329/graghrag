@@ -91,12 +91,23 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   };
 
   // Find relevant presets
-  const presets =
-    (selectedPaper &&
-      Object.entries(PRESET_QUESTIONS).find(([k]) =>
+  let presets = PRESET_QUESTIONS.default;
+  if (selectedPaper) {
+    if (selectedPaper.paper_id.includes(",") || selectedPaper.title.includes(" + ")) {
+      const titles = selectedPaper.title.split(" + ");
+      presets = [
+        `How do ${titles[0] || "Paper 1"} and ${titles[1] || "Paper 2"} differ in their core architectures and mathematical formulations?`,
+        `What are the shared concepts, common bridge nodes, and overlapping foundations between both papers?`,
+        `Compare the empirical benchmarks, datasets, and performance metrics across both research papers.`,
+        `Synthesize a unified comparative analysis of both papers' contributions using the combined knowledge graph.`
+      ];
+    } else {
+      const matched = Object.entries(PRESET_QUESTIONS).find(([k]) =>
         selectedPaper.title.toLowerCase().includes(k.toLowerCase())
-      )?.[1]) ||
-    PRESET_QUESTIONS.default;
+      );
+      if (matched) presets = matched[1];
+    }
+  }
 
   const currentAnswer = streamedAnswer || queryResult?.answer;
 

@@ -1,5 +1,49 @@
 [
   {
+    "id": "q_1791810291744_ymm1",
+    "timestamp": "2026-10-12T13:04:51.745Z",
+    "paper_id": "paper_1789911568626_3bmr,1703.08098_KG_Embedding_Survey",
+    "paper_title": "Fundus Image Analysis for Age related Retinal Disease Detection using Deep Learning and XAI Methods + Knowledge Graph Embedding: A Survey of Approaches and Applications",
+    "question": "Explain this research question clearly in detail: \"How does Tarjan's SCC compression group circular concept loops in \"Fundus Image Analysis for Age related Retinal Disease Detection using Deep Learning and XAI Methods + Knowledge Graph Embedding: A Survey of Approaches and Applications\"?\". Ground the answer in the paper's actual methodology. Explain why collapsing concepts with Tarjan SCC and keeping fracture rate at 0.00 via bridge-aware preservation is the absolute best representation for LLM retrieval.",
+    "mode": "ours",
+    "answer_preview": "### Multi-Paper Comparative Synthesis: **Fundus Image Analysis for Age related Retinal Disease Detection using Deep Learning and XAI Methods** ⟷ **Knowledge Gra",
+    "latency_ms": 365,
+    "tokens": 1840
+  },
+  {
+    "id": "q_1790098908824_qj61",
+    "timestamp": "2026-09-22T17:41:48.824Z",
+    "paper_id": "1706.03762_Attention_Is_All_You_Need",
+    "paper_title": "Attention Is All You Need",
+    "question": "Explain this research question clearly in detail: \"How does Tarjan's SCC algorithm collapse circular projection dependencies in Multi-Head Attention?\". Ground the answer in the paper's actual methodology. Explain why collapsing concepts with Tarjan SCC and keeping fracture rate at 0.00 via bridge-aware preservation is the absolute best representation for LLM retrieval.",
+    "mode": "ours",
+    "answer_preview": "### Multi-Head Attention replacing Recurrence in **Attention Is All You Need**  **1. Eliminating Recurrent Bottlenecks:** Prior sequence transduction models rel",
+    "latency_ms": 365,
+    "tokens": 1840
+  },
+  {
+    "id": "q_1790098874074_ibno",
+    "timestamp": "2026-09-22T17:41:14.075Z",
+    "paper_id": "paper_1789911568626_3bmr",
+    "paper_title": "Fundus Image Analysis for Age related Retinal Disease Detection using Deep Learning and XAI Methods",
+    "question": "Explain this research question clearly in detail: \"How does Tarjan's SCC compression group circular concept loops in \"Fundus Image Analysis for Age related Retinal Disease Detection using Deep Learning and XAI Methods\"?\". Ground the answer in the paper's actual methodology. Explain why collapsing concepts with Tarjan SCC and keeping fracture rate at 0.00 via bridge-aware preservation is the absolute best representation for LLM retrieval.",
+    "mode": "ours",
+    "answer_preview": "### Fundus Retinal Disease Detection with Deep Learning and Explainable AI (XAI)  **1. clinical Screening Framework:** Screens color fundus photography for Age-",
+    "latency_ms": 365,
+    "tokens": 1840
+  },
+  {
+    "id": "q_1790014502092_b27l",
+    "timestamp": "2026-09-21T18:15:02.092Z",
+    "paper_id": "paper_1789911568626_3bmr",
+    "paper_title": "Fundus Image Analysis for Age related Retinal Disease Detection using Deep Learning and XAI Methods",
+    "question": "Explain this research question clearly in detail: \"How does Tarjan's SCC compression group circular concept loops in \"Fundus Image Analysis for Age related Retinal Disease Detection using Deep Learning and XAI Methods\"?\". Ground the answer in the paper's actual methodology. Explain why collapsing concepts with Tarjan SCC and keeping fracture rate at 0.00 via bridge-aware preservation is the absolute best representation for LLM retrieval.",
+    "mode": "ours",
+    "answer_preview": "### Fundus Retinal Disease Detection with Deep Learning and Explainable AI (XAI)  **1. clinical Screening Framework:** Screens color fundus photography for Age-",
+    "latency_ms": 365,
+    "tokens": 1840
+  },
+  {
     "id": "q_1789972352010_un1h",
     "timestamp": "2026-09-21T06:32:32.010Z",
     "paper_id": "paper_1789927908284_fpzm",

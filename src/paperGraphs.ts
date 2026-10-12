@@ -1,10 +1,38 @@
-import { GraphNode, GraphEdge, GraphTopology } from "./types";
-import { buildQuotientGraph } from "./graphEngine";
+import { GraphNode, GraphEdge, GraphTopology, MethodTopologies } from "./types";
+import { buildQuotientGraph, combineMultiPaperTopologies } from "./graphEngine";
 
 export function getPaperGraphData(
   paperId: string,
   customTitle?: string
-): { original_graph: GraphTopology; compressed_graph: GraphTopology } {
+): {
+  original_graph: GraphTopology;
+  compressed_graph: GraphTopology;
+  method_graphs?: MethodTopologies;
+} {
+  if (paperId.includes(",")) {
+    const ids = paperId.split(",").map(id => id.trim()).filter(Boolean);
+    const paperList: { id: string; title: string; nodes: GraphNode[]; edges: GraphEdge[] }[] = [];
+
+    ids.forEach(id => {
+      const data = getPaperGraphData(id, customTitle);
+      // Clean title from id
+      const titleGuess = id.replace(/^paper_\d+_?/, "").replace(/_/g, " ");
+      paperList.push({
+        id: id,
+        title: titleGuess,
+        nodes: data.original_graph.nodes,
+        edges: data.original_graph.edges
+      });
+    });
+
+    const combinedResult = combineMultiPaperTopologies(paperList);
+    return {
+      original_graph: combinedResult.original_graph,
+      compressed_graph: combinedResult.compressed_graph,
+      method_graphs: combinedResult.method_graphs
+    };
+  }
+
   const idLower = (paperId + " " + (customTitle || "")).toLowerCase();
 
   // 1. Attention Is All You Need (18 ents, 26 rels)

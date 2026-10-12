@@ -48,6 +48,11 @@ export interface GraphNode {
   member_nodes?: GraphNode[];
   member_count?: number;
   source_chunk_ids?: string[];
+  paper_id?: string;
+  paper_title?: string;
+  is_shared?: boolean;
+  source_papers?: string[];
+  color?: string;
 }
 
 export interface GraphEdge {
@@ -56,6 +61,16 @@ export interface GraphEdge {
   type: string;
   weight?: number;
   is_bridge?: boolean;
+  description?: string;
+  is_cross_paper?: boolean;
+}
+
+export interface MethodTopologies {
+  ours: GraphTopology;
+  dynamic: GraphTopology;
+  static: GraphTopology;
+  local: GraphTopology;
+  original: GraphTopology;
 }
 
 export interface SCCDiagnostics {

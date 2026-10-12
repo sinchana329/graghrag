@@ -6,18 +6,37 @@ import { ChatPanel } from "./components/ChatPanel";
 import { AblationConfigDrawer } from "./components/AblationConfigDrawer";
 import { EvaluationBenchmarkView } from "./components/EvaluationBenchmarkView";
 import { CompressionQATrainer } from "./components/CompressionQATrainer";
-import { Paper, GraphTopology, QueryResult, TraversalTrace, TraversalStep, ConfigState } from "./types";
+import { HotpotQAValidatorView } from "./components/HotpotQAValidatorView";
+import { Paper, GraphTopology, QueryResult, TraversalTrace, TraversalStep, ConfigState, MethodTopologies } from "./types";
 import { PRELOADED_PAPERS, INITIAL_CONFIG, generatePaperGraph } from "./data";
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<"graphrag" | "benchmark" | "compression_qa">("graphrag");
+  const [activeTab, setActiveTab] = useState<"graphrag" | "benchmark" | "compression_qa" | "hotpotqa">("graphrag");
   const [papers, setPapers] = useState<Paper[]>(PRELOADED_PAPERS);
-  const [selectedPaper, setSelectedPaper] = useState<Paper | null>(PRELOADED_PAPERS[0]);
+  const [selectedPapers, setSelectedPapers] = useState<Paper[]>([PRELOADED_PAPERS[0]]);
+
+  const virtualSelectedPaper = React.useMemo(() => {
+    if (selectedPapers.length === 0) return null;
+    if (selectedPapers.length === 1) return selectedPapers[0];
+    return {
+      paper_id: selectedPapers.map(p => p.paper_id).join(","),
+      title: selectedPapers.map(p => p.title).join(" + "),
+      file_size_kb: selectedPapers.reduce((acc, p) => acc + p.file_size_kb, 0),
+      filename: "multi_selection.pdf",
+      status: "ready",
+      is_preloaded: true,
+      num_entities: selectedPapers.reduce((acc, p) => acc + p.num_entities, 0),
+      num_relations: selectedPapers.reduce((acc, p) => acc + p.num_relations, 0),
+      num_communities: selectedPapers.reduce((acc, p) => acc + (p.num_communities || 0), 0)
+    } as Paper;
+  }, [selectedPapers]);
 
   // Graph states
   const initialGraphs = generatePaperGraph(PRELOADED_PAPERS[0].paper_id);
   const [originalGraph, setOriginalGraph] = useState<GraphTopology | null>(initialGraphs.original_graph);
   const [compressedGraph, setCompressedGraph] = useState<GraphTopology | null>(initialGraphs.compressed_graph);
+  const [methodGraphs, setMethodGraphs] = useState<MethodTopologies | null>(initialGraphs.method_graphs || null);
+  const [activeMethod, setActiveMethod] = useState<string>("ours");
   const [trace, setTrace] = useState<TraversalTrace | null>(null);
 
   // Query & Answering states
@@ -35,12 +54,12 @@ export default function App() {
     loadConfig();
   }, []);
 
-  // When selected paper changes, fetch its graph
+  // When selected papers change, fetch the graph for the compound ID
   useEffect(() => {
-    if (selectedPaper) {
-      loadGraph(selectedPaper.paper_id);
+    if (virtualSelectedPaper) {
+      loadGraph(virtualSelectedPaper.paper_id);
     }
-  }, [selectedPaper]);
+  }, [virtualSelectedPaper]);
 
   const loadPapers = async () => {
     try {
@@ -49,8 +68,8 @@ export default function App() {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {
           setPapers(data);
-          if (!selectedPaper) {
-            setSelectedPaper(data[0]);
+          if (selectedPapers.length === 0) {
+            setSelectedPapers([data[0]]);
           }
         }
       }
@@ -78,15 +97,17 @@ export default function App() {
         const data = await res.json();
         if (data.original_graph) setOriginalGraph(data.original_graph);
         if (data.compressed_graph) setCompressedGraph(data.compressed_graph);
+        if (data.method_graphs) setMethodGraphs(data.method_graphs);
         return;
       }
     } catch (err) {
       console.warn("Backend graph endpoint offline, rendering generated graph:", err);
     }
     // Fallback to client-side graph generator
-    const graphs = generatePaperGraph(paperId);
+    const graphs = generatePaperGraph(paperId, virtualSelectedPaper?.title);
     setOriginalGraph(graphs.original_graph);
     setCompressedGraph(graphs.compressed_graph);
+    if (graphs.method_graphs) setMethodGraphs(graphs.method_graphs);
   };
 
   const handleUpdateConfig = async (newConfig: Partial<ConfigState>) => {
@@ -110,7 +131,7 @@ export default function App() {
 
   // Streaming query execution
   const handleExecuteQuery = async (question: string, mode: string) => {
-    if (!selectedPaper) return;
+    if (!virtualSelectedPaper) return;
 
     setIsQuerying(true);
     setStreamedAnswer("");
@@ -136,8 +157,8 @@ export default function App() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          paper_id: selectedPaper.paper_id,
-          paper_title: selectedPaper.title,
+          paper_id: virtualSelectedPaper.paper_id,
+          paper_title: virtualSelectedPaper.title,
           question: question,
           mode: mode,
         }),
@@ -149,8 +170,8 @@ export default function App() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            paper_id: selectedPaper.paper_id,
-            paper_title: selectedPaper.title,
+            paper_id: virtualSelectedPaper.paper_id,
+            paper_title: virtualSelectedPaper.title,
             question: question,
             mode: mode,
           }),
@@ -161,6 +182,7 @@ export default function App() {
         setTrace(syncData.trace);
         if (syncData.compressed_graph) setCompressedGraph(syncData.compressed_graph);
         if (syncData.original_graph) setOriginalGraph(syncData.original_graph);
+        if (syncData.method_graphs) setMethodGraphs(syncData.method_graphs);
         setIsQuerying(false);
         return;
       }
@@ -198,6 +220,7 @@ export default function App() {
             if (eventType === "topology") {
               if (parsed.original_graph) setOriginalGraph(parsed.original_graph);
               if (parsed.compressed_graph) setCompressedGraph(parsed.compressed_graph);
+              if (parsed.method_graphs) setMethodGraphs(parsed.method_graphs);
             } else if (eventType === "trace_step") {
               freshTrace.steps.push(parsed);
               setTrace({ ...freshTrace });
@@ -229,8 +252,8 @@ export default function App() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            paper_id: selectedPaper.paper_id,
-            paper_title: selectedPaper.title,
+            paper_id: virtualSelectedPaper.paper_id,
+            paper_title: virtualSelectedPaper.title,
             question: question,
             mode: mode,
           }),
@@ -252,7 +275,7 @@ export default function App() {
           {
             step_index: 1,
             action: "VISIT",
-            node_or_comm_id: `${selectedPaper.paper_id}_arch`,
+            node_or_comm_id: `${virtualSelectedPaper.paper_id}_arch`,
             level: 0,
             score: 94.5,
             reason: "Analyzed Strongly Connected Components (SCCs); preserved 2 articulation points and protected bridge edges.",
@@ -261,16 +284,16 @@ export default function App() {
           {
             step_index: 2,
             action: "EXPAND",
-            node_or_comm_id: `${selectedPaper.paper_id}_method`,
+            node_or_comm_id: `${virtualSelectedPaper.paper_id}_method`,
             level: 1,
             score: 88.2,
-            reason: `Traversed from root architecture into high-relevance scientific modules for '${selectedPaper.title}'.`,
+            reason: `Traversed from root architecture into high-relevance scientific modules for '${virtualSelectedPaper.title}'.`,
             timestamp_ms: 280
           },
           {
             step_index: 3,
             action: "BRIDGE_PRESERVE",
-            node_or_comm_id: `${selectedPaper.paper_id}_eval`,
+            node_or_comm_id: `${virtualSelectedPaper.paper_id}_eval`,
             level: 1,
             score: 91.0,
             reason: "Bridge-aware traversal kept connecting boundary paths between foundational methods and empirical evaluation.",
@@ -278,9 +301,9 @@ export default function App() {
           }
         ];
 
-        const answerText = `### Analysis grounded in ${selectedPaper.title} (${mode.toUpperCase()} mode):\n\n` +
+        const answerText = `### Analysis grounded in ${virtualSelectedPaper.title} (${mode.toUpperCase()} mode):\n\n` +
           `**Core Theoretical Mechanism & Graph Synthesis:**\n` +
-          `Based on the quotient graph traversal, the key architecture of **${selectedPaper.title}** eliminates extraneous recursive bottlenecks and optimizes representation learning.\n\n` +
+          `Based on the quotient graph traversal, the key architecture of **${virtualSelectedPaper.title}** eliminates extraneous recursive bottlenecks and optimizes representation learning.\n\n` +
           `**Key Insights for Query:** "${question}"\n` +
           `- **Topological Connectivity:** The formulation forms a cohesive strongly connected subgraph linking core representational mechanisms directly to the optimization objective.\n` +
           `- **Protected Bridge Paths:** Crucial structural transitions between theoretical formulations and empirical validation splits are preserved intact, preventing semantic fragmentation.\n` +
@@ -289,15 +312,15 @@ export default function App() {
         const simTrace: TraversalTrace = {
           mode: mode,
           steps: traceSteps,
-          visited_nodes: [`${selectedPaper.paper_id}_arch`, `${selectedPaper.paper_id}_method`, `${selectedPaper.paper_id}_eval`],
-          expanded_nodes: [`${selectedPaper.paper_id}_arch`],
+          visited_nodes: [`${virtualSelectedPaper.paper_id}_arch`, `${virtualSelectedPaper.paper_id}_method`, `${virtualSelectedPaper.paper_id}_eval`],
+          expanded_nodes: [`${virtualSelectedPaper.paper_id}_arch`],
           pruned_nodes: [],
-          bridge_kept_nodes: [`${selectedPaper.paper_id}_eval`],
-          selected_reports: [`${selectedPaper.paper_id}_comm_1`],
+          bridge_kept_nodes: [`${virtualSelectedPaper.paper_id}_eval`],
+          selected_reports: [`${virtualSelectedPaper.paper_id}_comm_1`],
           ratings: {
-            [`${selectedPaper.paper_id}_arch`]: 95,
-            [`${selectedPaper.paper_id}_method`]: 88,
-            [`${selectedPaper.paper_id}_eval`]: 91
+            [`${virtualSelectedPaper.paper_id}_arch`]: 95,
+            [`${virtualSelectedPaper.paper_id}_method`]: 88,
+            [`${virtualSelectedPaper.paper_id}_eval`]: 91
           },
           total_tokens: 1840,
           total_llm_calls: 3,
@@ -338,8 +361,22 @@ export default function App() {
           {/* Left: Paper Catalog & Upload Sidebar */}
           <PaperSidebar
             papers={papers}
-            selectedPaper={selectedPaper}
-            onSelectPaper={(p) => setSelectedPaper(p)}
+            selectedPapers={selectedPapers}
+            onSelectPapers={setSelectedPapers}
+            onSelectPaper={(p, multi) => {
+              if (multi) {
+                setSelectedPapers(prev => {
+                  const exists = prev.find(sp => sp.paper_id === p.paper_id);
+                  if (exists) {
+                    const next = prev.filter(sp => sp.paper_id !== p.paper_id);
+                    return next.length > 0 ? next : [p];
+                  }
+                  return [...prev, p];
+                });
+              } else {
+                setSelectedPapers([p]);
+              }
+            }}
             onPaperUploaded={loadPapers}
           />
 
@@ -347,24 +384,30 @@ export default function App() {
           <CytoscapeGraphViewer
             originalGraph={originalGraph}
             compressedGraph={compressedGraph}
+            methodGraphs={methodGraphs}
+            activeMethod={activeMethod}
+            onMethodChange={setActiveMethod}
             trace={trace}
-            selectedPaperTitle={selectedPaper?.title || "Research Paper Graph"}
+            selectedPaperTitle={virtualSelectedPaper?.title || "Research Paper Graph"}
           />
 
           {/* Right: Interactive Chat, Streaming Answer, Citations & Telemetry */}
           <ChatPanel
-            selectedPaper={selectedPaper}
+            selectedPaper={virtualSelectedPaper}
             onExecuteQuery={handleExecuteQuery}
             isQuerying={isQuerying}
             queryResult={queryResult}
             streamedAnswer={streamedAnswer}
           />
         </div>
+      ) : activeTab === "hotpotqa" ? (
+        /* HotpotQA Multi-Paper Live Validation Benchmark Suite */
+        <HotpotQAValidatorView />
       ) : activeTab === "compression_qa" ? (
         /* Compression QA Trainer & Evaluator Suite Tab */
         <CompressionQATrainer 
-          selectedPaper={selectedPaper}
-          onPaperChange={(p) => setSelectedPaper(p)}
+          selectedPaper={virtualSelectedPaper}
+          onPaperChange={(p) => setSelectedPapers([p])}
           papers={papers}
         />
       ) : (

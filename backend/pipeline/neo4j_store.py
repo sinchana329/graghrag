@@ -144,38 +144,89 @@ class Neo4jStore:
             logger.error(f"Error persisting graph to Neo4j: {e}")
 
     def get_paper_graph(self, paper_id: str, compressed: bool = False) -> Dict[str, Any]:
-        """Fetch either original or compressed graph topology for cytoscape visualization."""
+        """Fetch either original or compressed graph topology for cytoscape visualization. Supports comma-separated paper_ids."""
+        paper_ids = [pid.strip() for pid in paper_id.split(",") if pid.strip()]
+        
         driver = self.get_driver()
         if driver and self._connected:
             try:
                 with driver.session(database=self.database) as session:
                     label = "Supernode" if compressed else "Entity"
                     node_result = session.run(
-                        f"MATCH (n:{label} {{paper_id: $paper_id}}) RETURN properties(n) AS props",
-                        paper_id=paper_id
+                        f"MATCH (n:{label}) WHERE n.paper_id IN $paper_ids RETURN properties(n) AS props",
+                        paper_ids=paper_ids
                     )
-                    nodes = [record["props"] for record in node_result]
+                    raw_nodes = [record["props"] for record in node_result]
 
                     edge_type = "COMPRESSED_EDGE" if compressed else "RELATED_TO"
                     edge_result = session.run(
                         f"""
-                        MATCH (s:{label} {{paper_id: $paper_id}})-[r:{edge_type}]->(t:{label} {{paper_id: $paper_id}})
-                        RETURN s.id AS source, t.id AS target, properties(r) AS props
+                        MATCH (s:{label})-[r:{edge_type}]->(t:{label})
+                        WHERE s.paper_id IN $paper_ids AND t.paper_id IN $paper_ids
+                        RETURN s.id AS source, t.id AS target, properties(r) AS props, type(r) as r_type
                         """,
-                        paper_id=paper_id
+                        paper_ids=paper_ids
                     )
-                    edges = [
-                        {"source": r["source"], "target": r["target"], **r["props"]}
+                    raw_edges = [
+                        {"source": r["source"], "target": r["target"], **r["props"], "type": r["r_type"]}
                         for r in edge_result
                     ]
-                    if nodes:
-                        return {"nodes": nodes, "edges": edges, "compressed": compressed}
+                    
+                    if len(paper_ids) > 1:
+                        name_to_ids = {}
+                        for n in raw_nodes:
+                            n_name = n.get("name", "").lower()
+                            if n_name:
+                                if n_name not in name_to_ids:
+                                    name_to_ids[n_name] = []
+                                name_to_ids[n_name].append(n["id"])
+                        
+                        for name, ids in name_to_ids.items():
+                            if len(ids) > 1:
+                                for i in range(len(ids)):
+                                    for j in range(i + 1, len(ids)):
+                                        raw_edges.append({
+                                            "source": ids[i],
+                                            "target": ids[j],
+                                            "type": "CROSS_PAPER_LINK",
+                                            "weight": 1.0,
+                                            "description": f"Common point '{name}' across papers"
+                                        })
+
+                    if raw_nodes:
+                        return {"nodes": raw_nodes, "edges": raw_edges, "compressed": compressed}
             except Exception as e:
                 logger.warning(f"Neo4j query error: {e}. Falling back to memory.")
 
-        # Fallback to in-memory representation
-        nodes = self._memory_nodes.get(paper_id, [])
-        edges = self._memory_edges.get(paper_id, [])
+        # Fallback mult-paper combining
+        nodes = []
+        edges = []
+        name_to_ids = {}
+        for pid in paper_ids:
+            p_nodes = self._memory_nodes.get(pid, [])
+            p_edges = self._memory_edges.get(pid, [])
+            for n in p_nodes:
+                nodes.append(n)
+                n_name = n.get("name", "").lower()
+                if n_name:
+                    if n_name not in name_to_ids:
+                        name_to_ids[n_name] = []
+                    name_to_ids[n_name].append(n["id"])
+            edges.extend(p_edges)
+            
+        if len(paper_ids) > 1:
+            for name, ids in name_to_ids.items():
+                if len(ids) > 1:
+                    for i in range(len(ids)):
+                        for j in range(i + 1, len(ids)):
+                            edges.append({
+                                "source": ids[i],
+                                "target": ids[j],
+                                "type": "CROSS_PAPER_LINK",
+                                "weight": 1.0,
+                                "description": f"Common point '{name}' across papers"
+                            })
+
         return {"nodes": nodes, "edges": edges, "compressed": compressed}
 
     def close(self):

@@ -12,31 +12,55 @@ import {
   Info,
   ChevronRight
 } from "lucide-react";
-import { GraphTopology, TraversalStep, TraversalTrace, GraphNode } from "../types";
+import { GraphTopology, TraversalStep, TraversalTrace, GraphNode, MethodTopologies } from "../types";
 
 interface CytoscapeGraphViewerProps {
   originalGraph: GraphTopology | null;
   compressedGraph: GraphTopology | null;
+  methodGraphs?: MethodTopologies | null;
   trace: TraversalTrace | null;
   selectedPaperTitle: string;
+  activeMethod?: string;
+  onMethodChange?: (m: string) => void;
 }
 
 export const CytoscapeGraphViewer: React.FC<CytoscapeGraphViewerProps> = ({
   originalGraph,
   compressedGraph,
+  methodGraphs,
   trace,
   selectedPaperTitle,
+  activeMethod,
+  onMethodChange,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<Core | null>(null);
 
-  const [graphMode, setGraphMode] = useState<"compressed" | "original">("compressed");
+  const [graphMode, setGraphMode] = useState<"ours" | "dynamic" | "static" | "local" | "original">("ours");
   const [currentStepIndex, setCurrentStepIndex] = useState<number>(-1);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [selectedNodeData, setSelectedNodeData] = useState<any>(null);
   const [expandedSupernodeId, setExpandedSupernodeId] = useState<string | null>(null);
 
-  const activeGraph = graphMode === "compressed" ? compressedGraph : originalGraph;
+  // Sync with parent activeMethod if supplied
+  useEffect(() => {
+    if (activeMethod && ["ours", "dynamic", "static", "local"].includes(activeMethod)) {
+      setGraphMode(activeMethod as any);
+    }
+  }, [activeMethod]);
+
+  // Determine which graph topology is currently displayed
+  const activeGraph: GraphTopology | null = (() => {
+    if (methodGraphs) {
+      if (graphMode === "ours") return methodGraphs.ours;
+      if (graphMode === "dynamic") return methodGraphs.dynamic;
+      if (graphMode === "static") return methodGraphs.static;
+      if (graphMode === "local") return methodGraphs.local;
+      if (graphMode === "original") return methodGraphs.original;
+    }
+    return graphMode === "original" ? originalGraph : compressedGraph;
+  })();
+
   const steps: TraversalStep[] = trace?.steps || [];
 
   // Initialize or update Cytoscape
@@ -68,7 +92,16 @@ export const CytoscapeGraphViewer: React.FC<CytoscapeGraphViewerProps> = ({
     activeGraph.nodes.forEach((n) => {
       const isAP = articulationPoints.has(n.id) || n.is_connector;
       const isSuper = n.is_supernode;
+      const isShared = Boolean(n.is_shared);
       const memberCount = n.member_count || (n.member_node_ids?.length || 1);
+
+      const nodeColor = isShared
+        ? "#10b981" // Emerald for shared concept merged across papers
+        : isSuper
+        ? "#8b5cf6" // Violet for supernodes
+        : isAP
+        ? "#10b981"
+        : n.color || "#38bdf8";
 
       elements.push({
         data: {
@@ -78,9 +111,12 @@ export const CytoscapeGraphViewer: React.FC<CytoscapeGraphViewerProps> = ({
           description: n.description || "",
           isSupernode: isSuper,
           isConnector: isAP,
+          isShared: isShared,
+          paperTitle: n.paper_title || "",
+          sourcePapers: n.source_papers || [],
           memberCount: memberCount,
           memberNodes: n.member_nodes || [],
-          originalColor: isSuper ? "#8b5cf6" : isAP ? "#10b981" : "#3b82f6",
+          originalColor: nodeColor,
         },
       });
     });
@@ -89,6 +125,7 @@ export const CytoscapeGraphViewer: React.FC<CytoscapeGraphViewerProps> = ({
     activeGraph.edges.forEach((e, idx) => {
       const isBridge =
         e.is_bridge ||
+        e.is_cross_paper ||
         bridgeEdgeKeys.has(`${e.source}->${e.target}`) ||
         bridgeEdgeKeys.has(`${e.target}->${e.source}`);
 
@@ -99,6 +136,7 @@ export const CytoscapeGraphViewer: React.FC<CytoscapeGraphViewerProps> = ({
           target: e.target,
           type: e.type,
           isBridge: isBridge,
+          isCrossPaper: e.is_cross_paper || e.type === "SHARED_CROSS_LINK" || e.type === "CROSS_PAPER_LINK",
           weight: e.weight || 1,
         },
       });
@@ -121,12 +159,24 @@ export const CytoscapeGraphViewer: React.FC<CytoscapeGraphViewerProps> = ({
             "font-family": "system-ui, -apple-system, sans-serif",
             "text-valign": "bottom",
             "text-margin-y": 5,
-            width: "mapData(memberCount, 1, 15, 26, 52)",
-            height: "mapData(memberCount, 1, 15, 26, 52)",
+            width: "mapData(memberCount, 1, 15, 28, 56)",
+            height: "mapData(memberCount, 1, 15, 28, 56)",
             "border-width": 2,
             "border-color": "#475569",
             "transition-property": "background-color, border-color, border-width, width, height",
             "transition-duration": 0.25,
+          },
+        },
+        {
+          selector: "node[?isShared]",
+          style: {
+            shape: "diamond",
+            "background-color": "#10b981",
+            "border-width": 4,
+            "border-color": "#34d399",
+            width: 44,
+            height: 44,
+            "font-weight": "bold",
           },
         },
         {
@@ -165,6 +215,16 @@ export const CytoscapeGraphViewer: React.FC<CytoscapeGraphViewerProps> = ({
             "target-arrow-color": "#f59e0b",
             "line-style": "dashed",
             opacity: 0.9,
+          },
+        },
+        {
+          selector: "edge[?isCrossPaper]",
+          style: {
+            width: 3.5,
+            "line-color": "#f59e0b",
+            "target-arrow-color": "#f59e0b",
+            "line-style": "dashed",
+            opacity: 1.0,
           },
         },
         // Dynamic Traversal Highlights
@@ -223,12 +283,12 @@ export const CytoscapeGraphViewer: React.FC<CytoscapeGraphViewerProps> = ({
         name: "cose",
         animate: false,
         fit: true,
-        padding: 30,
+        padding: 35,
         randomize: false,
-        componentSpacing: 100,
-        nodeOverlap: 20,
-        nodeRepulsion: () => 400000,
-        idealEdgeLength: () => 80,
+        componentSpacing: 110,
+        nodeOverlap: 25,
+        nodeRepulsion: () => 450000,
+        idealEdgeLength: () => 85,
         edgeElasticity: () => 100,
         nestingFactor: 5,
         gravity: 80,
@@ -346,58 +406,121 @@ export const CytoscapeGraphViewer: React.FC<CytoscapeGraphViewerProps> = ({
   const diagnostics = compressedGraph?.diagnostics;
   const currentStep = steps[currentStepIndex];
 
+  const isMultiPaper = selectedPaperTitle.includes("+") || (activeGraph?.nodes.some(n => n.is_shared) ?? false);
+  const sharedCount = activeGraph?.nodes.filter(n => n.is_shared).length || 0;
+  const distinctCount = (activeGraph?.nodes.length || 0) - sharedCount;
+
+  const handleSelectMode = (m: "ours" | "dynamic" | "static" | "local" | "original") => {
+    setGraphMode(m);
+    if (onMethodChange && m !== "original") {
+      onMethodChange(m);
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col h-full bg-slate-950 relative overflow-hidden">
       {/* Top Bar Controls */}
-      <div className="px-4 py-2.5 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between z-10">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5 bg-slate-800 p-1 rounded-lg border border-slate-700">
+      <div className="px-4 py-2.5 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between z-10 flex-wrap gap-2">
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* Method / View Tabs */}
+          <div className="flex items-center gap-1 bg-slate-800 p-1 rounded-lg border border-slate-700">
             <button
-              onClick={() => setGraphMode("compressed")}
-              className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
-                graphMode === "compressed"
+              onClick={() => handleSelectMode("ours")}
+              className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all ${
+                graphMode === "ours"
                   ? "bg-indigo-600 text-white shadow"
                   : "text-slate-400 hover:text-slate-200"
               }`}
+              title="Tarjan SCC Quotient Graph with bridge preservation"
             >
-              Tarjan Compressed ({compressedGraph?.nodes.length || 0} nodes)
+              Ours (Tarjan SCC)
             </button>
             <button
-              onClick={() => setGraphMode("original")}
-              className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
+              onClick={() => handleSelectMode("dynamic")}
+              className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all ${
+                graphMode === "dynamic"
+                  ? "bg-indigo-600 text-white shadow"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+              title="Dynamic community & bridge-ranked traversal topology"
+            >
+              Dynamic Selection
+            </button>
+            <button
+              onClick={() => handleSelectMode("static")}
+              className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all ${
+                graphMode === "static"
+                  ? "bg-indigo-600 text-white shadow"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+              title="Static Level-1 Community Partition Topology"
+            >
+              Static Baseline
+            </button>
+            <button
+              onClick={() => handleSelectMode("local")}
+              className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all ${
+                graphMode === "local"
+                  ? "bg-indigo-600 text-white shadow"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+              title="Local Search 2-Hop Ego Neighborhood around shared entities"
+            >
+              Local Search (2-Hop)
+            </button>
+            <button
+              onClick={() => handleSelectMode("original")}
+              className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all ${
                 graphMode === "original"
                   ? "bg-indigo-600 text-white shadow"
                   : "text-slate-400 hover:text-slate-200"
               }`}
+              title="Raw uncompressed merged multi-paper graph"
             >
-              Original Graph ({originalGraph?.nodes.length || 0} nodes)
+              Raw Original
             </button>
           </div>
 
-          {compressedGraph?.compression_ratio && (
-            <span className="text-xs text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-md border border-emerald-500/20 font-medium">
-              Ratio: {Math.round(compressedGraph.compression_ratio * 100)}% of original size
+          {/* Node Count & Multi-Paper Pill */}
+          <span className="text-xs bg-slate-800/80 text-slate-300 px-2.5 py-1 rounded-md border border-slate-700/80 font-mono">
+            {activeGraph?.nodes.length || 0} nodes / {activeGraph?.edges.length || 0} edges
+          </span>
+
+          {isMultiPaper && (
+            <span className="text-xs text-emerald-300 bg-emerald-500/15 px-2.5 py-1 rounded-md border border-emerald-500/30 font-medium flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>Multi-Paper Combined: <strong>{sharedCount}</strong> Shared (Merged) &bull; <strong>{distinctCount}</strong> Separate</span>
+            </span>
+          )}
+
+          {activeGraph?.compression_ratio && graphMode !== "original" && (
+            <span className="text-xs text-indigo-300 bg-indigo-500/10 px-2 py-0.5 rounded-md border border-indigo-500/20 font-medium">
+              Ratio: {Math.round(activeGraph.compression_ratio * 100)}%
             </span>
           )}
         </div>
 
         {/* Legend */}
-        <div className="hidden xl:flex items-center gap-4 text-[11px] text-slate-400">
+        <div className="hidden xl:flex items-center gap-3.5 text-[11px] text-slate-400">
+          <div className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rotate-45 bg-emerald-500 border border-emerald-300" />
+            <span className="text-emerald-300 font-medium">Shared (Merged)</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-sky-500" />
+            <span>Distinct Node</span>
+          </div>
           <div className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-sm bg-purple-500 border border-purple-400" />
             <span>SCC Supernode</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-emerald-300" />
-            <span>Articulation Connector</span>
+            <span>Connector</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-4 h-0.5 border-b-2 border-amber-500 border-dashed" />
-            <span>Bridge Edge</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-            <span>Entity Node</span>
+            <span className="text-amber-400">Bridge Edge</span>
           </div>
         </div>
 
@@ -537,6 +660,34 @@ export const CytoscapeGraphViewer: React.FC<CytoscapeGraphViewerProps> = ({
           <p className="text-slate-400 text-xs leading-relaxed">
             {selectedNodeData.description || "No description provided."}
           </p>
+
+          {selectedNodeData.isShared && (
+            <div className="bg-emerald-950/70 border border-emerald-500/40 rounded-lg p-2.5 text-emerald-200 space-y-1.5">
+              <p className="font-semibold flex items-center gap-1.5 text-xs text-emerald-300">
+                <span className="w-2.5 h-2.5 rotate-45 bg-emerald-400" />
+                Cross-Paper Merged Concept
+              </p>
+              <p className="text-[11px] text-emerald-200/90 leading-snug">
+                This entity was identified as semantically shared across research papers and combined into a single unified anchor node.
+              </p>
+              {selectedNodeData.sourcePapers && selectedNodeData.sourcePapers.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {selectedNodeData.sourcePapers.map((sp: string, idx: number) => (
+                    <span key={idx} className="bg-emerald-900/60 text-emerald-200 text-[10px] px-1.5 py-0.5 rounded border border-emerald-500/30">
+                      📄 {sp}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {!selectedNodeData.isShared && selectedNodeData.paperTitle && (
+            <div className="bg-slate-800/80 border border-slate-700 rounded-lg p-2 text-slate-300">
+              <p className="text-[10px] text-slate-400 uppercase tracking-wide font-semibold">Originating Paper</p>
+              <p className="text-xs text-sky-300 font-medium mt-0.5">📄 {selectedNodeData.paperTitle}</p>
+            </div>
+          )}
 
           {selectedNodeData.isConnector && (
             <div className="bg-emerald-950/60 border border-emerald-500/30 rounded-lg p-2 text-emerald-200">

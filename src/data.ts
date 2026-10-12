@@ -1,4 +1,4 @@
-import { Paper, GraphTopology, ConfigState, BenchmarkConfigSummary } from "./types";
+import { Paper, GraphTopology, ConfigState, BenchmarkConfigSummary, MethodTopologies } from "./types";
 import { getPaperGraphData } from "./paperGraphs";
 
 export const INITIAL_CONFIG: ConfigState = {
@@ -126,7 +126,11 @@ export const PRELOADED_PAPERS: Paper[] = [
   }
 ];
 
-export function generatePaperGraph(paperId: string, customTitle?: string): { original_graph: GraphTopology; compressed_graph: GraphTopology } {
+export function generatePaperGraph(paperId: string, customTitle?: string): {
+  original_graph: GraphTopology;
+  compressed_graph: GraphTopology;
+  method_graphs?: MethodTopologies;
+} {
   return getPaperGraphData(paperId, customTitle);
 }
 

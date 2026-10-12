@@ -63,6 +63,7 @@ async def upload_paper(
     title: Optional[str] = Form(None)
 ):
     """Upload a PDF research paper or trigger ingestion of a preloaded landmark paper."""
+    print(f"API Upload called with file={file.filename if file else None}, preloaded_id={preloaded_id}, title={title}")
     if file:
         filename = file.filename
         dest_path = settings.PAPERS_DIR / filename
@@ -86,7 +87,8 @@ async def upload_paper(
             target_path = settings.PAPERS_DIR / f"{preloaded_id}.pdf"
 
         if not target_path.exists():
-            raise HTTPException(status_code=404, detail=f"Preloaded paper {preloaded_id} not found")
+            print(f"File not found: {target_path}")
+            raise HTTPException(status_code=404, detail=f"Preloaded paper {preloaded_id} not found at {target_path}")
 
         job_id = await ingestion_manager.start_ingestion(
             pdf_path=target_path,
@@ -114,20 +116,7 @@ async def get_paper_graph(paper_id: str):
     edges = paper_data.get("edges", [])
 
     if not nodes:
-        # Check if preloaded paper has not been processed yet; auto-generate starter topology
-        clean_title = paper_id.split("_", 1)[-1].replace("_", " ")
-        nodes = [
-            {"id": f"{paper_id}_arch", "name": f"{clean_title} Architecture", "type": "Architecture", "description": f"Core framework of {clean_title}", "source_chunk_ids": ["c1"]},
-            {"id": f"{paper_id}_method", "name": "Representation Mechanism", "type": "Method", "description": "Message passing & attention matrices", "source_chunk_ids": ["c1"]},
-            {"id": f"{paper_id}_bridge", "name": "Connector Formulation", "type": "Theory", "description": "Topological bridge connecting theory to objective", "source_chunk_ids": ["c2"]},
-            {"id": f"{paper_id}_eval", "name": "Empirical Benchmark", "type": "Metric", "description": "Experimental verification on standard datasets", "source_chunk_ids": ["c2"]}
-        ]
-        edges = [
-            {"source": f"{paper_id}_arch", "target": f"{paper_id}_method", "type": "IMPLEMENTS", "weight": 1.0, "source_chunk_ids": ["c1"]},
-            {"source": f"{paper_id}_method", "target": f"{paper_id}_bridge", "type": "FORMULATED_AS", "weight": 1.0, "source_chunk_ids": ["c2"]},
-            {"source": f"{paper_id}_bridge", "target": f"{paper_id}_eval", "type": "EVALUATED_BY", "weight": 1.0, "source_chunk_ids": ["c2"]}
-        ]
-        neo4j_store.save_entities_and_relations(paper_id, nodes, edges, [{"chunk_id": "c1", "section": "1. Introduction", "page": 1, "content": clean_title}])
+        raise HTTPException(status_code=404, detail="Graph not generated yet in Neo4j. Fallback to local.")
 
     compressed = compressor.compress_graph(nodes, edges)
 

@@ -4,82 +4,49 @@ Welcome to the **GraphRAG Publication Engine**! This application implements stat
 
 ---
 
-## 🚀 How to Run the Application in VS Code
+## 🚀 Quickstart: Running the Application
 
-Follow these clear, step-by-step instructions to get both the frontend UI and python backend running locally inside VS Code.
+Anyone who clones this repository can immediately launch and run the complete application:
 
-### Prerequisites
-Make sure you have the following installed on your machine:
-- **Python 3.10+**
-- **Node.js 18+ & npm**
-- **VS Code**
-
----
-
-### Step 1: Set Up Python Virtual Environment (`venv`)
-
-1. Open your terminal in VS Code (`Ctrl + ~` or `Cmd + ~`).
-2. Navigate to the project root directory.
-3. Create a python virtual environment:
-   ```bash
-   python -m venv venv
-   ```
-4. Activate the virtual environment:
-   - **Windows (Command Prompt):**
-     ```cmd
-     venv\Scripts\activate.bat
-     ```
-   - **Windows (PowerShell):**
-     ```powershell
-     venv\Scripts\Activate.ps1
-     ```
-   - **macOS / Linux:**
-     ```bash
-     source venv/bin/activate
-     ```
-
----
-
-### Step 2: Install Python Dependencies
-
-With your virtual environment active (`(venv)` should appear in your terminal prompt), run:
+### 1. Clone the repository
 ```bash
-pip install -r requirements.txt
+git clone https://github.com/sinchana329/graghrag.git
+cd graghrag
 ```
 
----
-
-### Step 3: Run the Integrated Compression Q&A Trainer Demo
-
-We have developed a standalone, interactive training and verification script (`run_qa_trainer.py`) to test and evaluate the decision-maker engine locally:
+### 2. Install dependencies
 ```bash
-python run_qa_trainer.py
+npm install
 ```
-This interactive script:
-- Verifies your Neo4j database connection
-- Demonstrates **Tarjan's SCC Compression** and calculates **Focus Index** and **Fracture Rate**
-- Provides an interactive Q&A loop that grades your answers against critical keywords
-- Demonstrates **Kannada (ಕನ್ನಡ)** translation and regional support!
+
+### 3. Run the development server
+```bash
+npm run dev
+```
+
+The Express API and Vite application will start seamlessly on **http://localhost:3003** (or http://localhost:3000 depending on your port configuration).
 
 ---
 
-### Step 4: Run the Full-Stack Application Dev Server
+## 🌟 Key Features
 
-To run the complete web UI (with Cytoscape interactive graph explorer, green Compression QA suite, voice-to-text input, and real-time streaming answers):
+1. **Multi-Paper Graph RAG & Knowledge Merging**:
+   - Upload or select multiple research papers simultaneously.
+   - Automatically detects and merges shared semantic concepts across papers into unified bridge nodes while preserving paper-specific distinct structures.
+   - Switchable across all 4 Graph RAG retrieval methodologies (**Ours - Tarjan SCC + Bridges**, **Dynamic Selection**, **Static Baseline**, and **Local Search**).
 
-1. **Install Frontend Dependencies:**
-   ```bash
-   npm install
-   ```
-2. **Start the Express & Vite Dev Server:**
-   ```bash
-   npm run dev
-   ```
-3. Open your browser to [http://localhost:3000](http://localhost:3000) to interact with the application.
+2. **HotpotQA Multi-Paper Validation Benchmark Suite**:
+   - Rigorous multi-hop cross-paper evaluation against gold-standard HotpotQA ground truth.
+   - **Real, dynamic performance indicators** (Speed in tokens/s, exact execution latency, genuine prompt & completion token consumption, and LLM call counts).
+   - Side-by-side 4-method comparison table for publication and live demo evaluation.
+
+3. **Interactive Cytoscape Visualizer & Compression QA**:
+   - Visual inspection of original vs. Tarjan SCC quotient collapsed graphs with bridge protection.
+   - Live Focus Index and zero-fracture rate preservation guarantees.
 
 ---
 
-## 🛠️ Environment Configuration (`.env`)
+## 🛠️ Environment Configuration (Optional)
 
 Create a `.env` file in the root directory and add your credentials if you wish to connect to a live Neo4j instance or leverage Gemini AI features:
 ```env

@@ -3,8 +3,8 @@ import { GitGraph, Activity, Sliders, Database, FileText, CheckCircle2, Award } 
 import { ConfigState } from "../types";
 
 interface HeaderProps {
-  activeTab: "graphrag" | "benchmark" | "compression_qa";
-  setActiveTab: (tab: "graphrag" | "benchmark" | "compression_qa") => void;
+  activeTab: "graphrag" | "benchmark" | "compression_qa" | "hotpotqa";
+  setActiveTab: (tab: "graphrag" | "benchmark" | "compression_qa" | "hotpotqa") => void;
   config: ConfigState | null;
   onOpenConfig: () => void;
 }
@@ -45,6 +45,17 @@ export const Header: React.FC<HeaderProps> = ({
         >
           <GitGraph className="w-3.5 h-3.5" />
           Interactive Explorer
+        </button>
+        <button
+          onClick={() => setActiveTab("hotpotqa")}
+          className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-medium rounded-lg transition-all ${
+            activeTab === "hotpotqa"
+              ? "bg-amber-500 text-slate-950 shadow-sm font-bold"
+              : "text-slate-400 hover:text-amber-400 hover:bg-slate-700/50"
+          }`}
+        >
+          <Activity className="w-3.5 h-3.5" />
+          HotpotQA Multi-Paper Validation
         </button>
         <button
           onClick={() => setActiveTab("compression_qa")}
